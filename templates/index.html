@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>J.A.R.V.I.S</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cyan: #00f5ff;
+    --blue: #0080ff;
+    --green: #00ff88;
+    --yellow: #ffcc00;
+    --red: #ff3355;
+    --dark: #020a14;
+    --panel: #040d1a;
+    --border: rgba(0,245,255,0.15);
+    --glow: 0 0 20px rgba(0,245,255,0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--dark);
+    color: var(--cyan);
+    font-family: 'Share Tech Mono', monospace;
+    height: 100vh;
+    overflow: hidden;
+    cursor: crosshair;
+  }
+
+  /* SCANLINE OVERLAY */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,245,255,0.015) 2px,
+      rgba(0,245,255,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* TOP BAR */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 20px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0,20,40,0.8);
+    backdrop-filter: blur(10px);
+    height: 48px;
+  }
+
+  .logo {
+    font-family: 'Orbitron', monospace;
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: 6px;
+    color: var(--cyan);
+    text-shadow: 0 0 20px var(--cyan), 0 0 40px rgba(0,245,255,0.5);
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0,255,136,0.1);
+    border: 1px solid rgba(0,255,136,0.3);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    color: var(--green);
+  }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  .topbar-center {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 13px;
+  }
+
+  .topbar-time {
+    font-family: 'Orbitron', monospace;
+    font-size: 15px;
+    color: #fff;
+    letter-spacing: 2px;
+  }
+
+  .topbar-weather {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: rgba(255,255,255,0.7);
+    font-size: 12px;
+  }
+
+  /* MAIN LAYOUT */
+  .main {
+    display: grid;
+    grid-template-columns: 280px 1fr 320px;
+    height: calc(100vh - 48px);
+    gap: 0;
+  }
+
+  /* PANELS */
+  .panel {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0,245,255,0.2) transparent;
+  }
+
+  .panel:last-child { border-right: none; border-left: 1px solid var(--border); }
+
+  .panel-section {
+    border-bottom: 1px solid var(--border);
+    padding: 14px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .section-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--cyan);
+    opacity: 0.8;
+  }
+
+  .section-icon {
+    font-size: 12px;
+    opacity: 0.6;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .section-icon:hover { opacity: 1; }
+
+  /* STAT BARS */
+  .stat-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 11px;
+  }
+
+  .stat-label { color: rgba(255,255,255,0.5); width: 60px; }
+  .stat-val { color: #fff; width: 40px; text-align: right; font-size: 10px; }
+
+  .bar-wrap {
+    flex: 1;
+    height: 4px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 2px;
+    margin: 0 8px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1s ease;
+    position: relative;
+  }
+
+  .bar-fill::after {
+    content: '';
+    position: absolute;
+    right: 0; top: 0;
+    width: 4px; height: 100%;
+    background: white;
+    border-radius: 2px;
+    box-shadow: 0 0 6px white;
+  }
+
+  .bar-cpu { background: linear-gradient(90deg, #0080ff, #00f5ff); }
+  .bar-ram { background: linear-gradient(90deg, #00cc44, #00ff88); }
+  .bar-disk { background: linear-gradient(90deg, #ff6600, #ffcc00); }
+  .bar-bat { background: linear-gradient(90deg, #00ff88, #00f5ff); }
+
+  /* MINI STATS GRID */
+  .mini-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .mini-stat {
+    background: rgba(0,245,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 6px;
+    text-align: center;
+  }
+
+  .mini-stat-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    color: #fff;
+    display: block;
+  }
+
+  .mini-stat-label {
+    font-size: 9px;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  /* WEATHER */
+  .weather-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .weather-temp {
+    font-family: 'Orbitron', monospace;
+    font-size: 36px;
+    color: #fff;
+    line-height: 1;
+  }
+
+  .weather-icon { font-size: 36px; }
+
+  .weather-desc {
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    margin-top: 4px;
+  }
+
+  .weather-city {
+    font-size: 12px;
+    color: var(--cyan);
+    margin-bottom: 2px;
+  }
+
+  .weather-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .weather-detail {
+    text-align: center;
+    font-size: 10px;
+    color: rgba(255,255,255,0.4);
+  }
+
+  .weather-detail span {
+    display: block;
+    color: #fff;
+    font-size: 12px;
+    margin-bottom: 2px;
+  }
+
+  /* NETWORK */
+  .net-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    margin-bottom: 6px;
+  }
+
+  .net-label { color: rgba(255,255,255,0.4); }
+  .net-val { color: var(--green); font-family: 'Orbitron', monospace; font-size: 10px; }
+
+  /* HEALTH */
+  .health-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    margin-bottom: 6px;
+    color: rgba(255,255,255,0.7);
+  }
+
+  .health-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    flex-shrink: 0;
+  }
+
+  /* CENTER */
+  .center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* GRID BACKGROUND */
+  .center::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,245,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,245,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* ORB */
+  .orb-container {
+    position: relative;
+    width: 320px;
+    height: 320px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .orb-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid rgba(0,245,255,0.2);
+    animation: orbRotate linear infinite;
+  }
+
+  .orb-ring-1 { width: 300px; height: 300px; animation-duration: 20s; border-color: rgba(0,245,255,0.15); }
+  .orb-ring-2 { width: 260px; height: 260px; animation-duration: 15s; animation-direction: reverse; border-color: rgba(0,128,255,0.2); }
+  .orb-ring-3 { width: 220px; height: 220px; animation-duration: 10s; border-color: rgba(0,245,255,0.1); }
+
+  .orb-ring::before {
+    content: '';
+    position: absolute;
+    width: 8px; height: 8px;
+    background: var(--cyan);
+    border-radius: 50%;
+    top: -4px; left: 50%;
+    transform: translateX(-50%);
+    box-shadow: 0 0 10px var(--cyan), 0 0 20px var(--cyan);
+  }
+
+  @keyframes orbRotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .orb-core {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at center,
+      rgba(0,245,255,0.3) 0%,
+      rgba(0,128,255,0.15) 40%,
+      rgba(0,0,0,0) 70%
+    );
+  }
+
+  .orb-particles {
+    position: absolute;
+    width: 100%; height: 100%;
+    border-radius: 50%;
+  }
+
+  .particle {
+    position: absolute;
+    width: 3px; height: 3px;
+    background: var(--cyan);
+    border-radius: 50%;
+    box-shadow: 0 0 6px var(--cyan);
+    animation: floatParticle linear infinite;
+  }
+
+  @keyframes floatParticle {
+    0% { transform: translateY(0) translateX(0) scale(1); opacity: 1; }
+    100% { transform: translateY(-80px) translateX(var(--dx)) scale(0); opacity: 0; }
+  }
+
+  .orb-inner {
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,245,255,0.8), rgba(0,128,255,0.4), transparent);
+    box-shadow: 0 0 30px var(--cyan), 0 0 60px rgba(0,245,255,0.4), inset 0 0 20px rgba(0,245,255,0.3);
+    animation: orbPulse 3s ease-in-out infinite;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  @keyframes orbPulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 30px var(--cyan), 0 0 60px rgba(0,245,255,0.4); }
+    50% { transform: scale(1.1); box-shadow: 0 0 50px var(--cyan), 0 0 100px rgba(0,245,255,0.6); }
+  }
+
+  .orb-bars {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .orb-bar {
+    width: 4px;
+    background: rgba(255,255,255,0.9);
+    border-radius: 2px;
+    animation: barDance 0.8s ease-in-out infinite alternate;
+  }
+
+  .orb-bar:nth-child(1) { height: 12px; animation-delay: 0s; }
+  .orb-bar:nth-child(2) { height: 20px; animation-delay: 0.1s; }
+  .orb-bar:nth-child(3) { height: 28px; animation-delay: 0.2s; }
+  .orb-bar:nth-child(4) { height: 20px; animation-delay: 0.3s; }
+  .orb-bar:nth-child(5) { height: 12px; animation-delay: 0.4s; }
+
+  @keyframes barDance {
+    from { transform: scaleY(0.3); opacity: 0.5; }
+    to { transform: scaleY(1); opacity: 1; }
+  }
+
+  /* ORB STATUS */
+  .orb-status {
+    margin-top: 24px;
+    text-align: center;
+  }
+
+  .orb-name {
+    font-family: 'Orbitron', monospace;
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: 8px;
+    color: #fff;
+    text-shadow: 0 0 20px var(--cyan);
+    margin-bottom: 8px;
+  }
+
+  .orb-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,255,136,0.1);
+    border: 1px solid rgba(0,255,136,0.3);
+    padding: 5px 16px;
+    border-radius: 20px;
+    font-size: 11px;
+    color: var(--green);
+    letter-spacing: 2px;
+  }
+
+  /* CONTROL BUTTONS */
+  .controls {
+    display: flex;
+    gap: 12px;
+    margin-top: 28px;
+  }
+
+  .ctrl-btn {
+    background: transparent;
+    border: 1px solid rgba(0,245,255,0.3);
+    color: var(--cyan);
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+  }
+
+  .ctrl-btn:hover {
+    background: rgba(0,245,255,0.1);
+    border-color: var(--cyan);
+    box-shadow: 0 0 15px rgba(0,245,255,0.3);
+    color: #fff;
+  }
+
+  .ctrl-btn.danger {
+    border-color: rgba(255,51,85,0.4);
+    color: var(--red);
+  }
+
+  .ctrl-btn.danger:hover {
+    background: rgba(255,51,85,0.1);
+    border-color: var(--red);
+    box-shadow: 0 0 15px rgba(255,51,85,0.3);
+  }
+
+  /* RIGHT PANEL - CHAT */
+  .right-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .chat-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .chat-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--cyan);
+  }
+
+  .chat-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .chat-action-btn {
+    background: rgba(0,245,255,0.05);
+    border: 1px solid var(--border);
+    color: rgba(255,255,255,0.5);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+  }
+
+  .chat-action-btn:hover {
+    border-color: var(--cyan);
+    color: var(--cyan);
+  }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0,245,255,0.2) transparent;
+  }
+
+  .msg {
+    max-width: 90%;
+    animation: msgIn 0.3s ease;
+  }
+
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg.jarvis { align-self: flex-start; }
+  .msg.user { align-self: flex-end; }
+
+  .msg-bubble {
+    padding: 10px 14px;
+    font-size: 12px;
+    line-height: 1.6;
+    border-radius: 2px;
+    position: relative;
+  }
+
+  .msg.jarvis .msg-bubble {
+    background: rgba(0,128,255,0.08);
+    border: 1px solid rgba(0,128,255,0.2);
+    border-left: 2px solid var(--blue);
+    color: rgba(255,255,255,0.85);
+  }
+
+  .msg.user .msg-bubble {
+    background: rgba(0,245,255,0.06);
+    border: 1px solid rgba(0,245,255,0.15);
+    border-right: 2px solid var(--cyan);
+    color: rgba(255,255,255,0.85);
+    text-align: right;
+  }
+
+  .msg-sender {
+    font-size: 9px;
+    letter-spacing: 2px;
+    margin-bottom: 4px;
+    opacity: 0.5;
+  }
+
+  .msg.jarvis .msg-sender { color: var(--blue); }
+  .msg.user .msg-sender { color: var(--cyan); text-align: right; }
+
+  .msg-time {
+    font-size: 9px;
+    opacity: 0.35;
+    margin-top: 4px;
+  }
+
+  .msg.user .msg-time { text-align: right; }
+
+  /* TYPING INDICATOR */
+  .typing {
+    display: flex;
+    gap: 4px;
+    padding: 10px 14px;
+    background: rgba(0,128,255,0.08);
+    border: 1px solid rgba(0,128,255,0.2);
+    border-left: 2px solid var(--blue);
+    width: fit-content;
+    border-radius: 2px;
+  }
+
+  .typing-dot {
+    width: 5px; height: 5px;
+    background: var(--blue);
+    border-radius: 50%;
+    animation: typingBounce 1.2s infinite;
+  }
+
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes typingBounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-6px); opacity: 1; }
+  }
+
+  /* CHAT INPUT */
+  .chat-input-area {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    background: rgba(0,10,20,0.5);
+  }
+
+  .chat-input {
+    flex: 1;
+    background: rgba(0,245,255,0.04);
+    border: 1px solid rgba(0,245,255,0.2);
+    color: #fff;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    padding: 10px 14px;
+    resize: none;
+    outline: none;
+    transition: border-color 0.2s;
+    border-radius: 2px;
+    max-height: 100px;
+    min-height: 40px;
+  }
+
+  .chat-input:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 10px rgba(0,245,255,0.15);
+  }
+
+  .chat-input::placeholder { color: rgba(255,255,255,0.2); }
+
+  .send-btn {
+    background: rgba(0,245,255,0.1);
+    border: 1px solid rgba(0,245,255,0.4);
+    color: var(--cyan);
+    width: 40px; height: 40px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
+  }
+
+  .send-btn:hover {
+    background: rgba(0,245,255,0.2);
+    box-shadow: 0 0 15px rgba(0,245,255,0.3);
+  }
+
+  /* UPTIME */
+  .uptime-display {
+    font-family: 'Orbitron', monospace;
+    font-size: 22px;
+    color: #fff;
+    letter-spacing: 4px;
+    text-align: center;
+    margin: 6px 0;
+  }
+
+  .uptime-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .uptime-cell {
+    background: rgba(0,245,255,0.04);
+    border: 1px solid var(--border);
+    padding: 8px;
+    text-align: center;
+    border-radius: 2px;
+  }
+
+  .uptime-cell-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 16px;
+    color: #fff;
+  }
+
+  .uptime-cell-label {
+    font-size: 9px;
+    color: rgba(255,255,255,0.3);
+    letter-spacing: 2px;
+    margin-top: 2px;
+  }
+
+  /* CORNER DECORATIONS */
+  .corner-dec {
+    position: absolute;
+    width: 20px; height: 20px;
+    opacity: 0.4;
+  }
+
+  .corner-dec.tl { top: 8px; left: 8px; border-top: 1px solid var(--cyan); border-left: 1px solid var(--cyan); }
+  .corner-dec.tr { top: 8px; right: 8px; border-top: 1px solid var(--cyan); border-right: 1px solid var(--cyan); }
+  .corner-dec.bl { bottom: 8px; left: 8px; border-bottom: 1px solid var(--cyan); border-left: 1px solid var(--cyan); }
+  .corner-dec.br { bottom: 8px; right: 8px; border-bottom: 1px solid var(--cyan); border-right: 1px solid var(--cyan); }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,245,255,0.2); border-radius: 2px; }
+
+  /* LOADING STATE */
+  .loading { display: none; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div class="logo">J.A.R.V.I.S</div>
+    <div class="status-pill">
+      <div class="status-dot"></div>
+      <span>ONLINE</span>
+    </div>
+  </div>
+
+  <div class="topbar-center">
+    <div class="topbar-time" id="topTime">--:-- --</div>
+    <div style="color:rgba(0,245,255,0.3)">|</div>
+    <div id="topDate" style="font-size:12px;color:rgba(255,255,255,0.6)">-- --- ----</div>
+  </div>
+
+  <div class="topbar-weather">
+    <span id="topWeatherIcon">🌤</span>
+    <span id="topWeatherTemp" style="color:#fff;font-family:'Orbitron',monospace;font-size:14px;">--°C</span>
+    <span id="topWeatherCity" style="color:var(--cyan)">İstanbul</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEFT PANEL -->
+  <div class="panel">
+
+    <!-- SYSTEM STATS -->
+    <div class="panel-section">
+      <div class="section-header">
+        <span class="section-title">⚙ SYSTEM STATS</span>
+        <span class="section-icon" onclick="refreshStats()">↻</span>
+      </div>
+
+      <div class="stat-row">
+        <span class="stat-label">CPU</span>
+        <div class="bar-wrap"><div class="bar-fill bar-cpu" id="cpuBar" style="width:8%"></div></div>
+        <span class="stat-val" id="cpuVal">8%</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">RAM</span>
+        <div class="bar-wrap"><div class="bar-fill bar-ram" id="ramBar" style="width:44%"></div></div>
+        <span class="stat-val" id="ramVal">44%</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">DISK</span>
+        <div class="bar-wrap"><div class="bar-fill bar-disk" id="diskBar" style="width:62%"></div></div>
+        <span class="stat-val" id="diskVal">62%</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">BATTERY</span>
+        <div class="bar-wrap"><div class="bar-fill bar-bat" id="batBar" style="width:88%"></div></div>
+        <span class="stat-val" id="batVal">88%</span>
+      </div>
+
+      <div class="mini-grid">
+        <div class="mini-stat">
+          <span class="mini-stat-val" id="miniCpu">8%</span>
+          <div class="mini-stat-label">CPU</div>
+        </div>
+        <div class="mini-stat">
+          <span class="mini-stat-val" id="miniMem">4GB</span>
+          <div class="mini-stat-label">MEMORY</div>
+        </div>
+        <div class="mini-stat">
+          <span class="mini-stat-val" id="miniDisk">439GB</span>
+          <div class="mini-stat-label">DISK</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WEATHER -->
+    <div class="panel-section">
+      <div class="section-header">
+        <span class="section-title">☁ WEATHER</span>
+        <span class="section-icon" onclick="fetchWeather()">↻</span>
+      </div>
+      <div class="weather-main">
+        <div>
+          <div class="weather-city" id="weatherCity">İstanbul, TR</div>
+          <div class="weather-temp" id="weatherTemp">--°C</div>
+          <div class="weather-desc" id="weatherDesc">Yükleniyor...</div>
+        </div>
+        <div class="weather-icon" id="weatherIcon">🌤</div>
+      </div>
+      <div class="weather-details">
+        <div class="weather-detail"><span id="weatherHum">--%</span>Humidity</div>
+        <div class="weather-detail"><span id="weatherWind">-- m/s</span>Wind</div>
+        <div class="weather-detail"><span id="weatherFeel">--°C</span>Feels Like</div>
+      </div>
+    </div>
+
+    <!-- NETWORK -->
+    <div class="panel-section">
+      <div class="section-header">
+        <span class="section-title">◈ NETWORK</span>
+      </div>
+      <div class="net-row">
+        <span class="net-label">▼ DOWNLOAD</span>
+        <span class="net-val" id="netDown">-- KB/s</span>
+      </div>
+      <div class="net-row">
+        <span class="net-label">▲ UPLOAD</span>
+        <span class="net-val" id="netUp">-- KB/s</span>
+      </div>
+      <div class="net-row">
+        <span class="net-label">PING</span>
+        <span class="net-val" id="netPing">-- ms</span>
+      </div>
+    </div>
+
+    <!-- HEALTH -->
+    <div class="panel-section">
+      <div class="section-header">
+        <span class="section-title">♡ HEALTH SUMMARY</span>
+      </div>
+      <div class="health-item"><div class="health-dot"></div><span>Kalp Atışı: <span style="color:#fff" id="heartRate">-- bpm</span></span></div>
+      <div class="health-item"><div class="health-dot"></div><span>Adım: <span style="color:#fff" id="steps">-- adım</span></span></div>
+      <div class="health-item"><div class="health-dot"></div><span>Mesafe: <span style="color:#fff" id="distance">-- km</span></span></div>
+    </div>
+
+    <!-- UPTIME -->
+    <div class="panel-section">
+      <div class="section-header">
+        <span class="section-title">⏱ SYSTEM UPTIME</span>
+        <span class="section-icon" id="uptimeDisplay2">00:00:19</span>
+      </div>
+      <div class="uptime-display" id="uptimeDisplay">00:00:00</div>
+      <div class="uptime-grid">
+        <div class="uptime-cell">
+          <div class="uptime-cell-val" id="sessionCount">1</div>
+          <div class="uptime-cell-label">SESSION</div>
+        </div>
+        <div class="uptime-cell">
+          <div class="uptime-cell-val" id="cmdCount">0</div>
+          <div class="uptime-cell-label">COMMANDS</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CENTER -->
+  <div class="center">
+    <div class="corner-dec tl"></div>
+    <div class="corner-dec tr"></div>
+    <div class="corner-dec bl"></div>
+    <div class="corner-dec br"></div>
+
+    <div class="orb-container">
+      <div class="orb-ring orb-ring-1"></div>
+      <div class="orb-ring orb-ring-2"></div>
+      <div class="orb-ring orb-ring-3"></div>
+      <div class="orb-core">
+        <div class="orb-particles" id="orbParticles"></div>
+        <div class="orb-inner" id="orbInner">
+          <div class="orb-bars">
+            <div class="orb-bar"></div>
+            <div class="orb-bar"></div>
+            <div class="orb-bar"></div>
+            <div class="orb-bar"></div>
+            <div class="orb-bar"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="orb-status">
+      <div class="orb-name">J.A.R.V.I.S</div>
+      <div class="orb-state" id="orbState">
+        <div class="status-dot"></div>
+        <span id="orbStateText">DINLENIYOR...</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="ctrl-btn" id="muteBtn" onclick="toggleMute()">MUTE</button>
+      <button class="ctrl-btn" id="pauseBtn" onclick="togglePause()">PAUSE</button>
+      <button class="ctrl-btn danger" onclick="shutdown()">SHUTDOWN</button>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="panel right-panel">
+    <div class="chat-header">
+      <span class="chat-title">◈ CONVERSATION</span>
+      <div class="chat-actions">
+        <button class="chat-action-btn" onclick="clearChat()">CLEAR</button>
+        <button class="chat-action-btn" onclick="exportChat()">EXPORT</button>
+      </div>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+      <div class="msg jarvis">
+        <div class="msg-sender">J.A.R.V.I.S</div>
+        <div class="msg-bubble">Sistemler aktif. Merhaba efendim. Emirlerinizi bekliyorum.</div>
+        <div class="msg-time" id="initTime">--:-- --</div>
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <textarea class="chat-input" id="chatInput" placeholder="Mesaj yazın..." rows="1"
+        onkeydown="handleKey(event)"
+        oninput="autoResize(this)"></textarea>
+      <button class="send-btn" onclick="sendMessage()">➤</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const BACKEND = 'https://jarvis-backend-2o9f.onrender.com';
+let isMuted = false;
+let isPaused = false;
+let cmdCount = 0;
+let startTime = Date.now();
+let isThinking = false;
+
+// ── CLOCK ──
+function updateClock() {
+  const now = new Date();
+  const h = now.getHours();
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const s = String(now.getSeconds()).padStart(2, '0');
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = String(h % 12 || 12).padStart(2, '0');
+  const timeStr = `${h12}:${m}:${s} ${ampm}`;
+  const months = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+  const days = ['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'];
+  const dateStr = `${days[now.getDay()]} ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+  document.getElementById('topTime').textContent = timeStr;
+  document.getElementById('topDate').textContent = dateStr;
+  document.getElementById('initTime').textContent = timeStr;
+}
+
+// ── UPTIME ──
+function updateUptime() {
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  const h = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+  const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+  const s = String(elapsed % 60).padStart(2, '0');
+  const str = `${h}:${m}:${s}`;
+  document.getElementById('uptimeDisplay').textContent = str;
+  document.getElementById('uptimeDisplay2').textContent = str;
+}
+
+// ── STATS (simulated) ──
+function refreshStats() {
+  const cpu = Math.floor(Math.random() * 30 + 5);
+  const ram = Math.floor(Math.random() * 20 + 40);
+  const disk = Math.floor(Math.random() * 10 + 58);
+  const bat = Math.floor(Math.random() * 5 + 85);
+  const netD = Math.floor(Math.random() * 500 + 100);
+  const netU = Math.floor(Math.random() * 100 + 20);
+  const ping = Math.floor(Math.random() * 30 + 5);
+
+  document.getElementById('cpuBar').style.width = cpu + '%';
+  document.getElementById('cpuVal').textContent = cpu + '%';
+  document.getElementById('ramBar').style.width = ram + '%';
+  document.getElementById('ramVal').textContent = ram + '%';
+  document.getElementById('diskBar').style.width = disk + '%';
+  document.getElementById('diskVal').textContent = disk + '%';
+  document.getElementById('batBar').style.width = bat + '%';
+  document.getElementById('batVal').textContent = bat + '%';
+  document.getElementById('miniCpu').textContent = cpu + '%';
+  document.getElementById('miniMem').textContent = Math.floor(ram * 0.08) + 'GB';
+  document.getElementById('miniDisk').textContent = Math.floor(disk * 4.75) + 'GB';
+  document.getElementById('netDown').textContent = netD + ' KB/s';
+  document.getElementById('netUp').textContent = netU + ' KB/s';
+  document.getElementById('netPing').textContent = ping + ' ms';
+  document.getElementById('heartRate').textContent = (Math.floor(Math.random() * 20 + 65)) + ' bpm';
+  document.getElementById('steps').textContent = (Math.floor(Math.random() * 2000 + 6000)).toLocaleString() + ' adım';
+  document.getElementById('distance').textContent = (Math.random() * 2 + 3).toFixed(1) + ' km';
+  document.getElementById('cmdCount').textContent = cmdCount;
+}
+
+// ── WEATHER ──
+async function fetchWeather() {
+  try {
+    const r = await fetch(`${BACKEND}/weather?city=Istanbul`);
+    const d = await r.json();
+    document.getElementById('weatherTemp').textContent = d.temp + '°C';
+    document.getElementById('weatherCity').textContent = d.city + ', TR';
+    document.getElementById('weatherDesc').textContent = d.desc;
+    document.getElementById('weatherHum').textContent = d.humidity + '%';
+    document.getElementById('topWeatherTemp').textContent = d.temp + '°C';
+    document.getElementById('topWeatherCity').textContent = d.city;
+    const icons = {'açık':' ☀️','bulut':'☁️','yağmur':'🌧','kar':'❄️','sis':'🌫','fırtına':'⛈'};
+    let icon = '🌤';
+    for (const [k, v] of Object.entries(icons)) {
+      if (d.desc.toLowerCase().includes(k)) { icon = v; break; }
+    }
+    document.getElementById('weatherIcon').textContent = icon;
+    document.getElementById('topWeatherIcon').textContent = icon;
+  } catch(e) {
+    document.getElementById('weatherDesc').textContent = 'Bağlantı hatası';
+  }
+}
+
+// ── ORB STATE ──
+function setOrbState(state) {
+  const orb = document.getElementById('orbInner');
+  const stateEl = document.getElementById('orbState');
+  const stateText = document.getElementById('orbStateText');
+  const states = {
+    listening: { color: 'var(--green)', text: 'DİNLENİYOR...', glow: 'var(--green)' },
+    thinking:  { color: 'var(--yellow)', text: 'DÜŞÜNÜYOR...', glow: 'var(--yellow)' },
+    speaking:  { color: 'var(--blue)', text: 'KONUŞUYOR...', glow: 'var(--blue)' },
+    error:     { color: 'var(--red)', text: 'HATA!', glow: 'var(--red)' }
+  };
+  const s = states[state] || states.listening;
+  orb.style.background = `radial-gradient(circle, ${s.color}cc, ${s.color}44, transparent)`;
+  orb.style.boxShadow = `0 0 30px ${s.glow}, 0 0 60px ${s.glow}44`;
+  stateEl.style.borderColor = s.glow + '44';
+  stateEl.style.background = s.glow + '11';
+  stateEl.style.color = s.glow;
+  stateText.textContent = s.text;
+}
+
+// ── PARTICLES ──
+function createParticles() {
+  const container = document.getElementById('orbParticles');
+  container.innerHTML = '';
+  for (let i = 0; i < 12; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const angle = Math.random() * 360;
+    const radius = 30 + Math.random() * 40;
+    const x = 80 + Math.cos(angle * Math.PI/180) * radius;
+    const y = 80 + Math.sin(angle * Math.PI/180) * radius;
+    p.style.left = x + 'px';
+    p.style.top = y + 'px';
+    p.style.setProperty('--dx', (Math.random() * 40 - 20) + 'px');
+    p.style.animationDuration = (2 + Math.random() * 3) + 's';
+    p.style.animationDelay = (Math.random() * 3) + 's';
+    container.appendChild(p);
+  }
+}
+
+// ── CHAT ──
+function addMessage(text, sender) {
+  const container = document.getElementById('chatMessages');
+  const now = new Date();
+  const time = now.toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit'});
+
+  const msg = document.createElement('div');
+  msg.className = `msg ${sender}`;
+  msg.innerHTML = `
+    <div class="msg-sender">${sender === 'jarvis' ? 'J.A.R.V.I.S' : 'SİZ'}</div>
+    <div class="msg-bubble">${text}</div>
+    <div class="msg-time">${time}</div>
+  `;
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+  cmdCount++;
+  document.getElementById('cmdCount').textContent = cmdCount;
+}
+
+function showTyping() {
+  const container = document.getElementById('chatMessages');
+  const typing = document.createElement('div');
+  typing.className = 'msg jarvis';
+  typing.id = 'typingIndicator';
+  typing.innerHTML = `
+    <div class="msg-sender">J.A.R.V.I.S</div>
+    <div class="typing">
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+    </div>
+  `;
+  container.appendChild(typing);
+  container.scrollTop = container.scrollHeight;
+}
+
+function hideTyping() {
+  const t = document.getElementById('typingIndicator');
+  if (t) t.remove();
+}
+
+async function sendMessage() {
+  if (isThinking) return;
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  addMessage(text, 'user');
+  input.value = '';
+  input.style.height = 'auto';
+
+  isThinking = true;
+  setOrbState('thinking');
+  showTyping();
+
+  try {
+    const r = await fetch(`${BACKEND}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text })
+    });
+    const d = await r.json();
+    hideTyping();
+    setOrbState('speaking');
+    addMessage(d.reply, 'jarvis');
+    setTimeout(() => setOrbState('listening'), 3000);
+  } catch(e) {
+    hideTyping();
+    setOrbState('error');
+    addMessage('Bağlantı hatası efendim. Backend çevrimdışı olabilir.', 'jarvis');
+    setTimeout(() => setOrbState('listening'), 3000);
+  }
+  isThinking = false;
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+function clearChat() {
+  const c = document.getElementById('chatMessages');
+  c.innerHTML = '';
+  addMessage('Sohbet temizlendi efendim. Emirlerinizi bekliyorum.', 'jarvis');
+}
+
+function exportChat() {
+  const msgs = document.querySelectorAll('.msg-bubble');
+  let text = 'J.A.R.V.I.S Sohbet Kaydı\n' + new Date().toLocaleString('tr-TR') + '\n\n';
+  msgs.forEach((m, i) => {
+    const sender = m.closest('.msg').classList.contains('jarvis') ? 'JARVIS' : 'SİZ';
+    text += `[${sender}]: ${m.textContent}\n`;
+  });
+  const blob = new Blob([text], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'jarvis-log.txt';
+  a.click();
+}
+
+function toggleMute() {
+  isMuted = !isMuted;
+  const btn = document.getElementById('muteBtn');
+  btn.textContent = isMuted ? 'UNMUTE' : 'MUTE';
+  btn.style.borderColor = isMuted ? 'rgba(255,51,85,0.4)' : '';
+  btn.style.color = isMuted ? 'var(--red)' : '';
+}
+
+function togglePause() {
+  isPaused = !isPaused;
+  const btn = document.getElementById('pauseBtn');
+  btn.textContent = isPaused ? 'RESUME' : 'PAUSE';
+  setOrbState(isPaused ? 'error' : 'listening');
+}
+
+function shutdown() {
+  if (confirm('J.A.R.V.I.S sistemleri kapatılsın mı?')) {
+    setOrbState('error');
+    document.getElementById('orbStateText').textContent = 'KAPANIYOR...';
+    setTimeout(() => {
+      document.body.style.animation = 'fadeOut 1s forwards';
+    }, 1000);
+  }
+}
+
+// ── INIT ──
+setInterval(updateClock, 1000);
+setInterval(updateUptime, 1000);
+setInterval(refreshStats, 3000);
+setInterval(createParticles, 4000);
+setInterval(fetchWeather, 300000);
+
+updateClock();
+updateUptime();
+refreshStats();
+createParticles();
+fetchWeather();
+setOrbState('listening');
+</script>
+</body>
+</html>
