@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: jarvis-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:10000
+    envVars:
+      - key: GEMINI_KEY
+        sync: false
+      - key: GROQ_KEY
+        sync: false
+      - key: WEATHER_KEY
+        sync: false
