@@ -224,7 +224,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dark);color:va
       <div class="tb-weather">
         <span id="tbWIcon">🌤</span>
         <span class="tb-weather-temp" id="tbWTemp">--°C</span>
-        <span class="tb-weather-city" id="tbWCity">İstanbul</span>
+        <span class="tb-weather-city" id="tbWCity">Gaziantep</span>
       </div>
     </div>
   </div>
@@ -246,7 +246,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dark);color:va
       <div class="widget" style="animation-delay:0.2s">
         <div class="widget-header"><div class="widget-title"><div class="wtdot" style="background:var(--blue);box-shadow:0 0 6px var(--blue)"></div>WEATHER</div><button class="wbtn" onclick="fetchWeather()">↻</button></div>
         <div class="weather-main">
-          <div><div class="weather-city" id="wCity">İstanbul, TR</div><div class="weather-temp" id="wTemp">--°C</div><div class="weather-desc" id="wDesc">Yükleniyor...</div></div>
+          <div><div class="weather-city" id="wCity">Gaziantep, TR</div><div class="weather-temp" id="wTemp">--°C</div><div class="weather-desc" id="wDesc">Yükleniyor...</div></div>
           <div class="weather-icon" id="wIcon">🌤</div>
         </div>
         <div class="weather-grid">
@@ -270,15 +270,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dark);color:va
         <div class="info-row"><span class="info-label">EUR/TRY</span><span class="info-val green" id="rEur">--</span></div>
         <div class="info-row"><span class="info-label">GBP/TRY</span><span class="info-val green" id="rGbp">--</span></div>
       </div>
-      <div class="widget" style="animation-delay:0.5s">
-        <div class="widget-header"><div class="widget-title"><div class="wtdot" style="background:var(--red);box-shadow:0 0 6px var(--red)"></div>SON DEPREMLER</div><button class="wbtn" onclick="fetchEarthquake()">↻</button></div>
-        <div id="quakeList"><div class="info-row"><span class="info-label">Yükleniyor...</span></div></div>
       </div>
       <div class="widget" style="animation-delay:0.6s">
-        <div class="widget-header"><div class="widget-title"><div class="wtdot" style="background:#aa88ff;box-shadow:0 0 6px #aa88ff"></div>SON HABERLER</div><button class="wbtn" onclick="fetchNews()">↻</button></div>
-        <div id="newsList"><div class="info-row"><span class="info-label">Yükleniyor...</span></div></div>
-      </div>
-      <div class="widget" style="animation-delay:0.7s">
         <div class="widget-header"><div class="widget-title"><div class="wtdot"></div>NETWORK</div></div>
         <div class="info-row"><span class="info-label">▼ İNDİRME</span><span class="info-val green" id="netDown">-- KB/s</span></div>
         <div class="info-row"><span class="info-label">▲ YÜKLEME</span><span class="info-val green" id="netUp">-- KB/s</span></div>
@@ -400,7 +393,8 @@ let orbTime=0,spinY=0,glitchT=0;
 function drawOrb(){
   ctx.clearRect(0,0,340,340);
   orbTime+=0.016;
-  spinY+=orbState==='thinking'?0.016:0.004;
+  const baseSpeed=isListening?0.012:0.002;
+  spinY+=orbState==='thinking'?0.016:baseSpeed;
   if(orbState==='error')glitchT+=0.1; else glitchT=0;
   const col=COLORS[orbState]||COLORS.listening;
   const {r,g,b}=col;
@@ -433,6 +427,7 @@ function drawOrb(){
     let radius=p.r;
     if(orbState==='thinking')radius=p.r*(0.65+0.35*Math.abs(Math.sin(orbTime*2)));
     else if(orbState==='speaking')radius=p.r*(1+Math.sin(orbTime*3+p.pulse)*0.14*(1+currentAudioLevel*2));
+  else if(isListening)radius=p.r*(1+Math.sin(orbTime*2+p.pulse)*0.08);
     else if(orbState==='error'){const j=Math.sin(glitchT*20+p.phi*5)*9;radius=p.r+j;}
     const st=Math.sin(p.theta),ct=Math.cos(p.theta);
     const sp=Math.sin(p.phi+spinY),cp=Math.cos(p.phi+spinY);
@@ -463,13 +458,12 @@ function drawOrb(){
     ctx.fillStyle='#fff';ctx.font='bold 14px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('!',0,5);
     ctx.restore();
   }
-  // Paused bars
+  // Paused - sadece orb sarı renkte, yavaş nabız
   if(orbState==='paused'){
-    ctx.save();ctx.translate(CX,CY);
-    ctx.fillStyle=`rgba(255,215,0,${0.35+Math.sin(orbTime*2)*0.2})`;
-    ctx.shadowColor='#ffd700';ctx.shadowBlur=10;
-    ctx.fillRect(-10,-14,7,28);ctx.fillRect(3,-14,7,28);
-    ctx.restore();
+    const pg=ctx.createRadialGradient(CX,CY,0,CX,CY,40);
+    pg.addColorStop(0,`rgba(255,215,0,${0.15+Math.sin(orbTime*1.5)*0.08})`);
+    pg.addColorStop(1,'rgba(255,215,0,0)');
+    ctx.fillStyle=pg;ctx.beginPath();ctx.arc(CX,CY,40,0,Math.PI*2);ctx.fill();
   }
   ctx.shadowBlur=0;
   requestAnimationFrame(drawOrb);
@@ -555,7 +549,7 @@ function setBar(bId,vId,pct){
 // WEATHER
 async function fetchWeather(){
   try{
-    const d=await(await fetch(`${BACKEND}/weather?city=Istanbul`)).json();
+    const d=await(await fetch(`${BACKEND}/weather?city=Gaziantep`)).json();
     document.getElementById('wTemp').textContent=d.temp+'°C';
     document.getElementById('wCity').textContent=d.city+', TR';
     document.getElementById('wDesc').textContent=d.desc;
@@ -663,7 +657,7 @@ async function handleUserInput(text){
       }else reply='NEWS_KEY yapılandırılmamış efendim.';
 
     }else if(intent==='weather'){
-      const d=await(await fetch(`${BACKEND}/weather?city=Istanbul`)).json();
+      const d=await(await fetch(`${BACKEND}/weather?city=Gaziantep`)).json();
       reply=`İstanbul: ${d.temp}°C, ${d.desc}. Hissedilen ${d.feels_like}°C, nem %${d.humidity}.`;
 
     }else if(intent==='youtube'){
@@ -834,19 +828,25 @@ function initTTS(){
 
 function speak(text){
   if(isMuted||!text)return;
-  const clean=text.replace(/<[^>]*>/g,'').replace(/&[^;]+;/g,'').trim();
+  // HTML, markdown temizle
+  let clean=text.replace(/<[^>]*>/g,' ').replace(/[#*`_~]/g,'').replace(/&[^;]+;/g,'').replace(/\s+/g,' ').trim();
+  // Çok uzunsa kısalt (TTS için)
+  if(clean.length>500)clean=clean.substring(0,500)+'...';
   if(!clean)return;
   synth.cancel();
-  const utt=new SpeechSynthesisUtterance(clean);
-  utt.lang='tr-TR';
-  utt.rate=1.05;
-  utt.pitch=0.9;
-  utt.volume=1;
-  if(ttsVoice)utt.voice=ttsVoice;
-  utt.onstart=()=>setOrbState('speaking');
-  utt.onend=()=>{if(orbState==='speaking')setOrbState('listening');};
-  utt.onerror=()=>{if(orbState==='speaking')setOrbState('listening');};
-  synth.speak(utt);
+  // Kısa gecikme - Android WebView için gerekli
+  setTimeout(()=>{
+    const utt=new SpeechSynthesisUtterance(clean);
+    utt.lang='tr-TR';
+    utt.rate=1.0;
+    utt.pitch=0.85;
+    utt.volume=1.0;
+    if(ttsVoice)utt.voice=ttsVoice;
+    utt.onstart=()=>setOrbState('speaking');
+    utt.onend=()=>setTimeout(()=>{if(orbState==='speaking')setOrbState('listening');},500);
+    utt.onerror=(e)=>{console.log('TTS hata:',e.error);if(orbState==='speaking')setOrbState('listening');};
+    synth.speak(utt);
+  }, 150);
 }
 
 function stopSpeaking(){synth.cancel();if(orbState==='speaking')setOrbState('listening');}
