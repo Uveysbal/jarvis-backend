@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html,body,div,button,canvas,textarea,input{-webkit-tap-highlight-color:rgba(0,0,0,0)!important;-webkit-tap-highlight-color:transparent!important;}
 *{
   -webkit-tap-highlight-color:transparent!important;
   -webkit-touch-callout:none;
@@ -177,8 +178,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--dark);color:va
 .cn.br{bottom:14px;right:14px;border-bottom:1px solid rgba(0,212,255,.25);border-right:1px solid rgba(0,212,255,.25);}
 
 /* ORB */
-.ow{position:relative;width:280px;height:280px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;-webkit-tap-highlight-color:transparent!important;outline:none;border:none;background:transparent;}
-#oc{display:block;-webkit-tap-highlight-color:transparent!important;}
+.ow{position:relative;width:280px;height:280px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;-webkit-tap-highlight-color:rgba(0,0,0,0)!important;outline:none!important;border:none!important;background:transparent!important;-webkit-appearance:none;appearance:none;}
+#oc{display:block;-webkit-tap-highlight-color:rgba(0,0,0,0)!important;outline:none!important;-webkit-user-select:none;user-select:none;}
 
 /* ORB STATUS */
 .osw{margin-top:16px;display:flex;flex-direction:column;align-items:center;gap:8px;z-index:10;}
@@ -704,7 +705,7 @@ function setOrbState(s){
 }
 
 // ═══ BOOT ═══
-const bmsgs=['Sistem çekirdekleri başlatılıyor...','AI modülleri yükleniyor...','Ağ bağlantıları kuruluyor...','Ses işlemcileri hazırlanıyor...','Güvenlik protokolleri aktif...','J.A.R.V.I.S v3.2 hazır.'];
+const bmsgs=['Sistem çekirdekleri başlatılıyor...','AI modülleri yükleniyor...','Ağ bağlantıları kuruluyor...','Ses işlemcileri hazırlanıyor...','Güvenlik protokolleri aktif...','J.A.R.V.I.S v3.3 hazır.'];
 function runBoot(){
   const c=document.getElementById('blines');
   bmsgs.forEach((m,i)=>{
@@ -1025,20 +1026,57 @@ function exportChat(){
 }
 
 // ═══ MİKROFON ═══
-function handleOrbClick(){if(isPaused||isThinking)return;if(isListening)stopListen();else startListen();}
+function handleOrbClick(){
+  if(isPaused||isThinking)return;
+  // TTS konuşuyorsa durdur
+  if(synth.speaking){synth.cancel();setOrbState('listening');return;}
+  if(isListening)stopListen();else startListen();
+}
 function startListen(){
-  if(!('webkitSpeechRecognition'in window)&&!('SpeechRecognition'in window)){
-    addMsg('Sesli komut desteklenmiyor efendim.','j');setOrbState('error');
-    setTimeout(()=>setOrbState('listening'),2000);return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition||null;
+  if(!SR){
+    addMsg('Sesli komut bu tarayıcıda desteklenmiyor efendim. Lütfen Chrome kullanın.','j');
+    setOrbState('error');setTimeout(()=>setOrbState('listening'),3000);return;
   }
-  isListening=true;
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  recognition=new SR();recognition.lang='tr-TR';recognition.continuous=false;recognition.interimResults=false;
-  recognition.onstart=()=>startAudio();
-  recognition.onresult=e=>{const t=e.results[0][0].transcript;isListening=false;stopAudio();handleInput(t);};
-  recognition.onerror=()=>{isListening=false;};
-  recognition.onend=()=>{isListening=false;stopAudio();};
-  recognition.start();
+  // Mikrofon izni iste
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    stream.getTracks().forEach(t=>t.stop()); // izin alındı, stream'i kapat
+    isListening=true;
+    setOrbState('listening');
+    recognition=new SR();
+    recognition.lang='tr-TR';
+    recognition.continuous=false;
+    recognition.interimResults=false;
+    recognition.maxAlternatives=1;
+    recognition.onstart=()=>{
+      startAudio();
+      addMsg('Dinliyorum efendim...','j');
+    };
+    recognition.onresult=e=>{
+      const t=e.results[0][0].transcript;
+      isListening=false;stopAudio();
+      // "Dinliyorum" mesajını kaldır
+      const msgs=document.querySelectorAll('.msg.j .mb');
+      if(msgs.length&&msgs[msgs.length-1].textContent==='Dinliyorum efendim...')
+        msgs[msgs.length-1].closest('.msg').remove();
+      handleInput(t);
+    };
+    recognition.onerror=e=>{
+      isListening=false;stopAudio();
+      const msgs=document.querySelectorAll('.msg.j .mb');
+      if(msgs.length&&msgs[msgs.length-1].textContent==='Dinliyorum efendim...')
+        msgs[msgs.length-1].closest('.msg').remove();
+      if(e.error==='not-allowed')addMsg('Mikrofon izni reddedildi efendim.','j');
+      else if(e.error==='no-speech')setOrbState('listening');
+      else addMsg('Ses tanıma hatası: '+e.error,'j');
+      setOrbState('listening');
+    };
+    recognition.onend=()=>{isListening=false;stopAudio();};
+    recognition.start();
+  }).catch(err=>{
+    addMsg('Mikrofon erişimi reddedildi efendim. Tarayıcı ayarlarından izin verin.','j');
+    setOrbState('error');setTimeout(()=>setOrbState('listening'),3000);
+  });
 }
 function stopListen(){isListening=false;if(recognition)recognition.stop();stopAudio();setOrbState('listening');}
 
