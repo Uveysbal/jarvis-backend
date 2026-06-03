@@ -734,27 +734,33 @@ let ttsVoice=null;
 function initTTS(){
   function load(){
     const vs=synth.getVoices();
-    ttsVoice=vs.find(v=>v.lang==='tr-TR'&&v.name.includes('Google'))
+    // Öncelik: Google Türkçe erkek > Google Türkçe > herhangi Türkçe
+    ttsVoice=vs.find(v=>v.lang==='tr-TR'&&v.name.includes('Google')&&v.name.toLowerCase().includes('male'))
+      ||vs.find(v=>v.lang==='tr-TR'&&v.name.includes('Google'))
       ||vs.find(v=>v.lang==='tr-TR')
-      ||vs.find(v=>v.lang.startsWith('tr'))||vs[0]||null;
+      ||vs.find(v=>v.lang.startsWith('tr'))||null;
+    console.log('TTS ses:', ttsVoice ? ttsVoice.name : 'yok');
   }
   load();if(synth.onvoiceschanged!==undefined)synth.onvoiceschanged=load;
 }
 function speak(txt){
   if(isMuted||!txt)return;
-  let cl=txt.replace(/<[^>]*>/g,' ').replace(/[#*`_~\[\]]/g,'').replace(/\s+/g,' ').trim();
-  if(cl.length>600)cl=cl.substring(0,600)+'...';
+  let cl=txt.replace(/<[^>]*>/g,' ').replace(/[#*`_~[\]]/g,'').replace(/\s+/g,' ').trim();
+  if(cl.length>500)cl=cl.substring(0,500)+'...';
   if(!cl)return;
   synth.cancel();
   setTimeout(()=>{
     const u=new SpeechSynthesisUtterance(cl);
-    u.lang='tr-TR';u.rate=1.0;u.pitch=0.85;u.volume=1.0;
+    u.lang='tr-TR';
+    u.rate=1.15;   // Biraz hızlı — daha doğal
+    u.pitch=1.0;   // Normal pitch — robot değil
+    u.volume=1.0;
     if(ttsVoice)u.voice=ttsVoice;
     u.onstart=()=>setOrbState('speaking');
-    u.onend=()=>setTimeout(()=>{if(orbState==='speaking')setOrbState('listening');},400);
+    u.onend=()=>setTimeout(()=>{if(orbState==='speaking')setOrbState('listening');},300);
     u.onerror=()=>{if(orbState==='speaking')setOrbState('listening');};
     synth.speak(u);
-  },120);
+  },100);
 }
 function stopSpeak(){synth.cancel();if(orbState==='speaking')setOrbState('listening');}
 
