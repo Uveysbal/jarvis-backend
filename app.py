@@ -63,7 +63,7 @@ Kullanıcının her isteğini yerine getirmeye çalış."""
         try:
             headers = {'Authorization': f'Bearer {GROQ_KEY}', 'Content-Type': 'application/json'}
             body = {
-                "model": "llama-3.3-70b-specdec",
+                "model": "llama3-70b-8192",
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": message}
@@ -71,8 +71,13 @@ Kullanıcının her isteğini yerine getirmeye çalış."""
                 "max_tokens": 1024
             }
             r = requests.post('https://api.groq.com/openai/v1/chat/completions', headers=headers, json=body, timeout=20)
-            reply = r.json()['choices'][0]['message']['content']
-            return jsonify({'reply': reply, 'engine': 'groq'})
+            resp_json = r.json()
+            if 'choices' in resp_json:
+                reply = resp_json['choices'][0]['message']['content']
+                return jsonify({'reply': reply, 'engine': 'groq'})
+            else:
+                error_msg = resp_json.get('error', {}).get('message', str(resp_json))
+                return jsonify({'reply': f'Groq hatası efendim: {error_msg}', 'engine': 'error'})
         except Exception as e:
             return jsonify({'reply': f'Bağlantı hatası efendim: {str(e)}', 'engine': 'error'})
 
