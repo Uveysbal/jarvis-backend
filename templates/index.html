@@ -510,6 +510,7 @@ function runBoot(){
   },4300);
 }
 function initApp(){
+  initTTS();
   updateClock();updateUptime();refreshStats();
   fetchWeather();fetchPrayer();fetchRates();fetchEarthquake();fetchNews();fetchIP();
   document.getElementById('initMsgTime').textContent=getCurrentTime();
@@ -728,6 +729,7 @@ async function handleUserInput(text){
     }
 
     hideTyping();setOrbState('speaking');
+    speak(reply);
     const msgDiv=document.createElement('div');msgDiv.className='msg jarvis';
     msgDiv.innerHTML=`<div class="msg-sender">J.A.R.V.I.S</div><div class="msg-bubble">${reply}${extraHtml}</div><div class="msg-time">${getCurrentTime()}</div>`;
     const cm=document.getElementById('chatMessages');cm.appendChild(msgDiv);cm.scrollTop=99999;
@@ -814,8 +816,49 @@ function stopAudioVisualize(){
   currentAudioLevel=0;
 }
 
+// ═══ TTS — JARVIS KONUŞMA ═══
+const synth=window.speechSynthesis;
+let ttsVoice=null;
+
+function initTTS(){
+  function loadVoices(){
+    const voices=synth.getVoices();
+    ttsVoice=voices.find(v=>v.lang==='tr-TR'&&v.name.includes('Google'))
+      ||voices.find(v=>v.lang==='tr-TR')
+      ||voices.find(v=>v.lang.startsWith('tr'))
+      ||voices[0]||null;
+  }
+  loadVoices();
+  if(synth.onvoiceschanged!==undefined)synth.onvoiceschanged=loadVoices;
+}
+
+function speak(text){
+  if(isMuted||!text)return;
+  const clean=text.replace(/<[^>]*>/g,'').replace(/&[^;]+;/g,'').trim();
+  if(!clean)return;
+  synth.cancel();
+  const utt=new SpeechSynthesisUtterance(clean);
+  utt.lang='tr-TR';
+  utt.rate=1.05;
+  utt.pitch=0.9;
+  utt.volume=1;
+  if(ttsVoice)utt.voice=ttsVoice;
+  utt.onstart=()=>setOrbState('speaking');
+  utt.onend=()=>{if(orbState==='speaking')setOrbState('listening');};
+  utt.onerror=()=>{if(orbState==='speaking')setOrbState('listening');};
+  synth.speak(utt);
+}
+
+function stopSpeaking(){synth.cancel();if(orbState==='speaking')setOrbState('listening');}
+
 // CONTROLS
-function toggleMute(){isMuted=!isMuted;const b=document.getElementById('muteBtn');b.textContent=isMuted?'UNMUTE':'MUTE';b.className=isMuted?'ctrl-btn active':'ctrl-btn';}
+function toggleMute(){
+  isMuted=!isMuted;
+  const b=document.getElementById('muteBtn');
+  b.textContent=isMuted?'UNMUTE':'MUTE';
+  b.className=isMuted?'ctrl-btn active':'ctrl-btn';
+  if(isMuted)synth.cancel();
+}
 function togglePause(){isPaused=!isPaused;const b=document.getElementById('pauseBtn');b.textContent=isPaused?'RESUME':'PAUSE';b.className=isPaused?'ctrl-btn active':'ctrl-btn';setOrbState(isPaused?'paused':'listening');}
 
 // SHUTDOWN
